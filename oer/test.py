@@ -71,8 +71,22 @@ def test_display_none():
   expect = """<html><body><test>1</test></body></html>"""
   eq_(expect, run(html, css))
 
+def test_target_text():
+  css    = """test          { content: target-text(attr(href), content()); }
+              test::before  { content: target-text(attr(href), content(before)); }
+              test::after   { content: target-text(attr(href), content(after)); }
+              test2::before { content: "BEFORE"; }
+              test2::after  { content: "AFTER"; }
+              inner::before { content: "B"; }
+              inner::after  { content: "D"; }
+              """
+  html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C</inner>E</test2>X</body></html>"""
+  expect = """<html><body><test href="#itsme"><span class="pseudo-before">BEFORE</span>ABCDE<span class="pseudo-after">AFTER</span></test><test2 id="itsme"><span class="pseudo-before">BEFORE</span>A<inner><span class="pseudo-before">B</span>C<span class="pseudo-after">D</span></inner>E<span class="pseudo-after">AFTER</span></test2>X</body></html>"""
+  eq_(expect, run(html, css))
+
 
 def main():
+  test_target_text()
   test_display_none()
   test_content_replace_and_counter()
   test_target_counter()
@@ -81,4 +95,5 @@ def main():
   test_attr()
 
 if __name__ == '__main__':
+    import sys
     sys.exit(main())

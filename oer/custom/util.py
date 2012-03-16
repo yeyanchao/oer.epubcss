@@ -100,6 +100,25 @@ class ContentPropertyParser(object):
       return str(stream.next())
     return default
 
+  def _parse_target_text(self, stream):
+    # These look like: "target-counter(attr(href), counter-name)"
+    #               or "target-counter(attr(href, url), counter-name)"
+    #               or "target-counter(attr(href, url), counter-name, upper-roman)"
+    #
+    assert str(stream.next()) == '('             # ignore the outer "("
+    assert str(stream.next()) == 'attr'
+    (attr, _, _) = self._parse_attr(stream)
+    which = 'before'                             # If there's no content(...) then before is default
+    content = self._optional(stream, None)
+    if content == 'content':                     # If there's a content() then all text is used
+      which = 'at'
+      assert str(stream.next()) == '('
+      if str(stream.peek()) != ')':
+        which = str(stream.next())
+      assert str(stream.next()) == ')'
+    assert str(stream.next()) == ')'             # ignore the outer ")"
+    return (attr, which)
+
   def _parse_target_counter(self, stream):
     # These look like: "target-counter(attr(href), counter-name)"
     #               or "target-counter(attr(href, url), counter-name)"

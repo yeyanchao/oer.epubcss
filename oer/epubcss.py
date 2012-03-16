@@ -17,11 +17,16 @@ PSEUDO_ELEMENT_NAME = 'span' # For HTML5, it would be 'ins'
 
 class UnsupportedError(Exception): pass
 
+class State(object):
+  def __init__(self, node, counters):
+    self.node = node
+    self.counters = counters.copy()
+
 class AddNumbering(object):
 
   def __init__(self):
     self.counters = {}
-    self.node_ids = {}   # Node id's that are targets for counters and the current counter values at that point ('m10000-id1213' -> {'exercise', 4})
+    self.node_at = {}
     self.reprocess = [] # nodes with content: target-counter(....) and the current counter values at that point for the node: (etree.Element, {'name', 4})
 
   def transform(self, html, explicit_styles = [], pretty_print = True):
@@ -89,19 +94,55 @@ class AddNumbering(object):
     else:
       node.text = text
 
+  def lookup_state(self, node, attr):
+    id = node.attrib.get(attr, None)
+    if id:
+      if id[0] == '#':
+        id = id[1:]
+      if id in self.node_at:
+        return self.node_at[id]
+  
+  def lookup_text(self, node, attr, which):
+    """ Used by target-text(attr(href), content(first-letter)) """
+    import pdb; pdb.set_trace()
+    state = self.lookup_state(node, attr)
+    if state:
+      if which == 'before':
+        if len(state.node) > 0 and self.is_pseudo(state.node[0]):
+          return state.node[0].text # guaranteed it doesn;t have child elements
+      elif which == 'after':
+        if len(state.node) > 0 and self.is_pseudo(state.node[-1]):
+          return state.node[-1].text # guaranteed it doesn;t have child elements
+      else:
+        text = ''
+        if state.node.text: text += state.node.text
+        import pdb; pdb.set_trace()
+        def rec_add(n):
+          text = ''
+          if n.text: text += n.text
+          for s in n: text += rec_add(s)
+          if n.tail: text += n.tail
+          return text
+        for child in state.node:
+          if not self.is_pseudo(child):
+            text += rec_add(child)
+          elif child.tail: text += child.tail
+        text = ''.join(text)
+        if which == 'first-letter':
+          text = text.strip()
+          if text: return text[0]
+          else: return ''
+        else: return text
     
   def lookup_counter(self, node, attr, name):
     # Look up the node (strip of the leading "#" in the href)
     v = 0
-    href = node.attrib.get(attr, None)
-    if href:
-      id = href[1:]
-      if id in self.node_ids:
-        c = self.node_ids[id]
-        if not c:
-          print >> sys.stderr, "WARNING: Trying to get target-counter of a non-existent id '%s'" % id
-        elif name in c:
-          v = c[name]
+    state = self.lookup_state(node, attr)
+    if state:
+      if not state.counters:
+        print >> sys.stderr, "WARNING: Trying to get target-counter of a non-existent id '%s'" % id
+      elif name in state.counters:
+        v = state.counters[name]
     else:
       print >> sys.stderr, "WARNING: Element %s does not have attribute '%s' to look up" % (node.tag, attr)
     return v
@@ -123,6 +164,14 @@ class AddNumbering(object):
     if DEBUG: print >> sys.stderr, "DEBUG: Generated: %s from content:[%s]" % (str(vals), content)
     ret = ''.join(vals)
     return ret
+
+  def _eval_target_text(self, node, args):
+    (attr, which) = args
+    n = node
+    if self.is_pseudo(node):
+      n = node.getparent()
+    v = self.lookup_text(n, attr, which)
+    return v
 
   def _eval_target_counter(self, node, args):
     (attr, name, numbering) = args
@@ -179,17 +228,17 @@ class AddNumbering(object):
       self.update_counters(node, d)
     # if there's a target-counter pointing to this node, squirrel the counter (TODO: Should this be done _before_ incrementing?)
     id = node.attrib.get('id', None)
-    if id and id in self.node_ids:
-      self.node_ids[id] = self.counters.copy()
+    if id and id in self.node_at:
+      self.node_at[id] = State(node, self.counters)
     if d:
       # We'll have to look up the id later to find the counter
       if 'content' in d:
         has_target = False
         for (key, _) in d['content']:
-          if 'target-counter' == key:
+          if key in [ 'target-counter', 'target-text' ]:
             has_target = True
         if has_target:
-          self.reprocess.append((node, self.counters.copy()))
+          self.reprocess.append((node, State(node, self.counters)))
         else:
           self._replace_content(node, d['content'])
 
@@ -204,24 +253,27 @@ class AddNumbering(object):
     node.attrib[STYLE_ATTRIBUTE] = newStyle
     # Also, if there's a target-counter then add it to the list
     if 'content' in d:
-      content = d['content']
-      if 'target-counter' in content:
-        content = ContentPropertyParser().parse(content)
-        if content is not None:
-          for (function, args) in content:
-            if function == 'target-counter':
-              (attr, _, _) = args
-              n = node
-              # If it's a pseudo element use the parent's attribute
-              if class_ != '': n = node.getparent()
-              id = n.attrib.get(attr, '')
-              if id and len(id) > 0:
-                # omit the hash tag
-                if id[0] == '#':
-                  id = id[1:]
-                self.node_ids[id] = None
-              else:
-                print >> sys.stderr, "WARNING: Ignoring lookup to a non-internal id: '%s' on a %s" % (href, n.tag)
+      content = ContentPropertyParser().parse(d['content'])
+      if content is not None:
+        for (function, args) in content:
+          attr = None
+          if function == 'target-counter':
+            (attr, _, _) = args
+          if function == 'target-text':
+            (attr, _) = args
+          
+          if attr:
+            n = node
+            # If it's a pseudo element use the parent's attribute
+            if class_ != '': n = node.getparent()
+            id = n.attrib.get(attr, '')
+            if id and len(id) > 0:
+              # omit the hash tag
+              if id[0] == '#':
+                id = id[1:]
+              self.node_at[id] = None
+            else:
+              print >> sys.stderr, "WARNING: Ignoring lookup to a non-internal id: '%s' on a %s" % (href, n.tag)
     
     if not class_ and ':before' in style:
       pseudo = etree.Element(PSEUDO_ELEMENT_NAME)
