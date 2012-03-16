@@ -104,7 +104,6 @@ class AddNumbering(object):
   
   def lookup_text(self, node, attr, which):
     """ Used by target-text(attr(href), content(first-letter)) """
-    import pdb; pdb.set_trace()
     state = self.lookup_state(node, attr)
     if state:
       if which == 'before':
@@ -116,7 +115,6 @@ class AddNumbering(object):
       else:
         text = ''
         if state.node.text: text += state.node.text
-        import pdb; pdb.set_trace()
         def rec_add(n):
           text = ''
           if n.text: text += n.text

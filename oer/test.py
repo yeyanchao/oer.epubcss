@@ -79,8 +79,9 @@ def test_target_text():
               test2::after  { content: "AFTER"; }
               inner::before { content: "B"; }
               inner::after  { content: "D"; }
+              hide          { display: none; }
               """
-  html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C</inner>E</test2>X</body></html>"""
+  html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
   expect = """<html><body><test href="#itsme"><span class="pseudo-before">BEFORE</span>ABCDE<span class="pseudo-after">AFTER</span></test><test2 id="itsme"><span class="pseudo-before">BEFORE</span>A<inner><span class="pseudo-before">B</span>C<span class="pseudo-after">D</span></inner>E<span class="pseudo-after">AFTER</span></test2>X</body></html>"""
   eq_(expect, run(html, css))
 
