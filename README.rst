@@ -47,25 +47,31 @@ This tool takes both the CSS and HTML and transforms it into the following::
   <figure><img src=".."/><caption><span>Figure 12: </span>Such a cute cat</caption></figure>
 
 
+------------------------------
+ Linked Lookup (CSS 3)
+------------------------------
 
-For example, let's say you have the following link::
+For example, let's say you have the following CSS and HTML::
+
+  a[href] { content: target-text(attr(href), content()); }
 
   Be sure to check out <a href="#factoring">Factoring Polynomials</a>.
 
-and the follwing style::
+``target-text`` and ``target-counter`` are new in CSS 3 and are not supported by browsers and definitely not EPUB readers.
+This tool spits out the following::
 
-  a[href] {
-    content: target-text(attr(href), content(before)) target-text(attr(href), content());
-    content: content() " (Page " target-counter(attr(href), page) ")"; 
-  }
+  Be sure to check out <a href="#factoring"><span>4.7 Factoring Polynomials</span></a>.
 
-If you have a rendering tool that understands page numbers (like PDF) then both lines work and the 2nd one will be used resulting in something like::
 
-  Be sure to check out Factoring Polynomails (Page 43)
+------------------------------
+ Graceful Fallback
+------------------------------
 
-Whereas this tool will only parse the 1st (it doesn't recognize the counter named "page") and result in something like::
+Often it's useful in printed content to refer to page numbers (since users can't click) and some PDF generation tools will understand the CSS but there's no need to keep 2 CSS files around for EPUB and PDF.
+This package gracefully ignores CSS properties it can't parse (like looking up a page number in the ``{ content: counter(page); }``). 
+Adding a rule to the previous example will yield the same HTML as before but still render page numbers for PDFs::
 
-  Be sure to check out <a href="#factoring">1.2 Factoring Polynomials<a>
+  a[href] { content: content() " (Page " counter(page) ")"; }
 
 
 PS: Use http://lesscss.org
