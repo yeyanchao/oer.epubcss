@@ -9,6 +9,7 @@
 import codecs
 from lxml import etree
 from lxml.cssselect import CSSSelector
+import sys
 import os
 import re
 import urllib
@@ -116,7 +117,7 @@ class Premailer(object):
                  remove_classes=True,
                  strip_important=True,
                  external_styles=None,
-                 custom_style_attrib='style', explicit_styles=[]): # HACK
+                 custom_style_attrib='style', explicit_styles=[], verbose=False): # HACK
         self.html = html
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
@@ -133,6 +134,7 @@ class Premailer(object):
         # HACK: Added this customization
         self.custom_style_attrib = custom_style_attrib
         self.explicit_styles = explicit_styles
+        self.verbose = verbose
 
     def _parse_style_rules(self, css_body):
         leftover = []
@@ -239,10 +241,10 @@ class Premailer(object):
             # AND: TODO (this will be fixed by _merge_styles using util.parse_style)
             # - the property values don't contain unknown functions or the PDF-specific "page" counter
             if 'content:' in style or 'counter-' in style or 'display:none' in style:
-              import sys; print >> sys.stderr, "Applying rule: [%s%s]" % (selector, class_),
+              if self.verbose: print >> sys.stderr, "Applying rule: [%s%s]" % (selector, class_),
               sel = CSSSelector(selector)
               nodes = sel(page)
-              import sys; print >> sys.stderr, "%d times" % len(nodes)
+              if self.verbose: print >> sys.stderr, "%d times" % len(nodes)
   
               for item in nodes:
                   old_style = item.attrib.get(self.custom_style_attrib, '') # HACK
@@ -259,7 +261,7 @@ class Premailer(object):
                   self._style_to_basic_html_attributes(item, new_style,
                                                        force=True)
             else:
-              # import sys; print >> sys.stderr, "Skipping rule: [%s]" % selector
+              # if self.verbose: print >> sys.stderr, "Skipping rule: [%s]" % selector
               pass
 
         # Re-apply initial inline styles.

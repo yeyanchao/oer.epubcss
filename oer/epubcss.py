@@ -11,9 +11,8 @@ from custom.util import PropertyParser, ContentPropertyParser, parse_style
 __all__ = ['AddNumbering', 'UnsupportedError']
 
 STYLE_ATTRIBUTE = '_custom_style'
-DEBUG = 'DEBUG' in os.environ
 
-PSEUDO_ELEMENT_NAME = 'span' # For HTML5, it would be 'ins'
+PSEUDO_ELEMENT_NAME = '{http://www.w3.org/1999/xhtml}span' # For HTML5, it would be 'ins'
 
 class UnsupportedError(Exception): pass
 
@@ -24,16 +23,16 @@ class State(object):
 
 class AddNumbering(object):
 
-  def __init__(self):
+  def __init__(self, verbose=False):
     self.counters = {}
     self.node_at = {}
     self.reprocess = [] # nodes with content: target-counter(....) and the current counter values at that point for the node: (etree.Element, {'name', 4})
+    self.verbose = verbose
 
   def transform(self, html, explicit_styles = [], pretty_print = True):
-
     xpath = etree.XPath('//*')
     
-    p = premailer.Premailer(html, explicit_styles=explicit_styles, remove_classes=False, custom_style_attrib=STYLE_ATTRIBUTE)
+    p = premailer.Premailer(html, explicit_styles=explicit_styles, remove_classes=False, custom_style_attrib=STYLE_ATTRIBUTE, verbose=self.verbose)
     html = p.transform(pretty_print=pretty_print)
     html = etree.parse(StringIO(html))
     nodes = xpath(html)
@@ -45,19 +44,19 @@ class AddNumbering(object):
     # - recalculate all the remaining content (that has target-counter) by looking up the nodes
     # - remove the styling attribute
     
-    print >> sys.stderr, "-------- Creating pseudo elements ( CSS :before and :after ) : %d" % len(nodes)
+    if self.verbose: print >> sys.stderr, "-------- Creating pseudo elements ( CSS :before and :after ) : %d" % len(nodes)
     for node in nodes:
       style = node.attrib.get(STYLE_ATTRIBUTE, '')
       self.expand_pseudo(node, style)
     
-    print >> sys.stderr, "-------- Running counters and generating simple content",
+    if self.verbose: print >> sys.stderr, "-------- Running counters and generating simple content",
     nodes = xpath(html) # we may have added pseudo nodes so re-self.update
-    print >> sys.stderr, ": %d" % len(nodes)
+    if self.verbose: print >> sys.stderr, ": %d" % len(nodes)
     # This has to be done in a separate pass so we can look up target-counter
     for node in nodes:
       self.mutate_node(node)
 
-    print >> sys.stderr, "-------- Resolving link counters ( CSS3 target-counter ) : %d" % len(self.reprocess)
+    if self.verbose: print >> sys.stderr, "-------- Resolving link counters ( CSS3 target-counter ) : %d" % len(self.reprocess)
     for (node, self.countersAt) in self.reprocess:
       self.counters = self.countersAt
       d = PropertyParser().parse(node.attrib.get(STYLE_ATTRIBUTE, ''))
@@ -138,11 +137,11 @@ class AddNumbering(object):
     state = self.lookup_state(node, attr)
     if state:
       if not state.counters:
-        print >> sys.stderr, "WARNING: Trying to get target-counter of a non-existent id '%s'" % id
+        if self.verbose: print >> sys.stderr, "WARNING: Trying to get target-counter of a non-existent id '%s'" % id
       elif name in state.counters:
         v = state.counters[name]
     else:
-      print >> sys.stderr, "WARNING: Element %s does not have attribute '%s' to look up" % (node.tag, attr)
+      if self.verbose: print >> sys.stderr, "WARNING: Element %s does not have attribute '%s' to look up" % (node.tag, attr)
     return v
 
   def make_content(self, node, content):
@@ -159,7 +158,7 @@ class AddNumbering(object):
         val = method(node, args)
         if val is not None: vals.append(val)
 
-    if DEBUG: print >> sys.stderr, "DEBUG: Generated: %s from content:[%s]" % (str(vals), content)
+    if self.verbose: print >> sys.stderr, "DEBUG: Generated: %s from content:[%s]" % (str(vals), content)
     ret = ''.join(vals)
     return ret
 
@@ -211,11 +210,11 @@ class AddNumbering(object):
     if 'counter-reset' in d:
       for (name, v) in d['counter-reset']:
         if name == 'none': continue
-        if DEBUG: print >> sys.stderr, "Resetting %s to %d" % (name, v)
+        if self.verbose: print >> sys.stderr, "Resetting %s to %d" % (name, v)
         self.counters[name] = v
     if 'counter-increment' in d:
       for (name, v) in d['counter-increment']:
-        if DEBUG: print >> sys.stderr, "Incrementing %s by %s" % (name, str(v))
+        if self.verbose: print >> sys.stderr, "Incrementing %s by %s" % (name, str(v))
         if name not in self.counters:
           self.counters[name] = 0
         self.counters[name] += v
@@ -271,7 +270,7 @@ class AddNumbering(object):
                 id = id[1:]
               self.node_at[id] = None
             else:
-              print >> sys.stderr, "WARNING: Ignoring lookup to a non-internal id: '%s' on a %s" % (href, n.tag)
+              if self.verbose: print >> sys.stderr, "WARNING: Ignoring lookup to a non-internal id: '%s' on a %s" % (href, n.tag)
     
     if not class_ and ':before' in style:
       pseudo = etree.Element(PSEUDO_ELEMENT_NAME)
@@ -301,17 +300,17 @@ def main():
     try:
       import argparse
       parser = argparse.ArgumentParser(description='Apply CSS pseudo elements :before/:after and counters to HTML since epub does not support them')
-      # parser.add_argument('-v', dest='verbose', help='Verbose printing to stderr', action='store_true')
+      parser.add_argument('-v', dest='verbose', help='Verbose printing to stderr', action='store_true')
       parser.add_argument('-c', dest='css', help='CSS File', type=argparse.FileType('r'), nargs='*')
       parser.add_argument('-o', dest='output', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
       parser.add_argument('html',              nargs='?', type=argparse.FileType('r'), default=sys.stdin)
       args = parser.parse_args()
   
-      # if args.verbose: print >> sys.stderr, "Transforming..."
+      # if self.verbose: if self.verbose: print >> sys.stderr, "Transforming..."
       css = []
       for style in args.css:
         css.append(style.read())
-      result = AddNumbering().transform(args.html.read(), css)
+      result = AddNumbering(verbose=args.verbose).transform(args.html.read(), css)
       html = etree.tostring(result, encoding='ascii')
       args.output.write(html)
       
