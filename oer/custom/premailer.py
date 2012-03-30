@@ -241,7 +241,7 @@ class Premailer(object):
             # AND: TODO (this will be fixed by _merge_styles using util.parse_style)
             # - the property values don't contain unknown functions or the PDF-specific "page" counter
             if 'content:' in style or 'counter-' in style or 'display:none' in style:
-              if self.verbose: print >> sys.stderr, "Applying rule: [%s%s]" % (selector, class_),
+              if self.verbose: print >> sys.stderr, "Applying CSS Selector: [%s%s]" % (selector, class_),
               sel = CSSSelector(selector)
               nodes = sel(page)
               if self.verbose: print >> sys.stderr, "%d times" % len(nodes)
@@ -261,7 +261,7 @@ class Premailer(object):
                   self._style_to_basic_html_attributes(item, new_style,
                                                        force=True)
             else:
-              # if self.verbose: print >> sys.stderr, "Skipping rule: [%s]" % selector
+              # if self.verbose: print >> sys.stderr, "SKIPPING rule: [%s]" % selector
               pass
 
         # Re-apply initial inline styles.

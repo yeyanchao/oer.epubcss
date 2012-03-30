@@ -158,7 +158,7 @@ class AddNumbering(object):
         val = method(node, args)
         if val is not None: vals.append(val)
 
-    if self.verbose: print >> sys.stderr, "DEBUG: Generated: %s from content:[%s]" % (str(vals), content)
+    if self.verbose: print >> sys.stderr, "DEBUG: Generated: [%s] from content:[%s]" % (''.join(vals), content)
     ret = ''.join(vals)
     return ret
 
