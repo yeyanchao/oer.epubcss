@@ -240,7 +240,7 @@ class Premailer(object):
             # - manipulating counters
             # AND: TODO (this will be fixed by _merge_styles using util.parse_style)
             # - the property values don't contain unknown functions or the PDF-specific "page" counter
-            if 'content:' in style or 'counter-' in style or 'display:none' in style:
+            if 'content:' in style or 'string-' in style or 'counter-' in style or 'display:none' in style:
               if self.verbose: print >> sys.stderr, "Applying CSS Selector: [%s%s]" % (selector, class_),
               sel = CSSSelector(selector)
               nodes = sel(page)

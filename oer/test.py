@@ -2,6 +2,8 @@
 from lxml import etree
 from epubcss import AddNumbering
 
+VERBOSE = False
+
 def eq_(expect, actual):
   if expect != actual:
     print "ERROR!"
@@ -9,7 +11,7 @@ def eq_(expect, actual):
     print "actual  =[" + actual + "]"
 
 def run(html, css):
-  actual = AddNumbering().transform(html, [css], pretty_print = False)
+  actual = AddNumbering(pseudo_element_name='span', verbose = VERBOSE).transform(html, [css], pretty_print = False)
   return etree.tostring(actual)
 
 def test_content_basic():
@@ -99,6 +101,25 @@ def test_target_text_and_counters():
   expect = """<html><body><test href="#itsme"><span class="pseudo-before">BEFORE</span>ABCDE<span class="pseudo-after">AFTER</span></test><test2 id="itsme"><span class="pseudo-before">BEFORE</span>A<inner><span class="pseudo-before">B</span>C<span class="pseudo-after">D</span></inner>E<span class="pseudo-after">AFTER</span></test2>X</body></html>"""
   eq_(expect, run(html, css))
 
+def test_string_set():
+  css    = """html          { string-set: test-string "SHOULD NEVER SEE THIS"; }
+              body          { string-set: test-string "SIMPLE"; }
+              test::before  { content: string(test-string); }
+              test          { string-set: test-string target-text(attr(href), content()) " LOKKING-UP-A-LINK"; }
+              test2         { content: string(test-string); }
+              """
+  html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
+  expect = """<html><body><test href="#itsme"><span class="pseudo-before">SIMPLE</span></test><test2 id="itsme">SIMPLE<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
+  eq_(expect, run(html, css))
+
+def test_string_set_advanced():
+  css    = """test          { string-set: test-string target-text(attr(href), content()) " LOKKING-UP-A-LINK"; }
+              test2         { content: string(test-string); }
+              """
+  html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
+  expect = """<html><body><test href="#itsme"/><test2 id="itsme">AE</test2>X</body></html>"""
+  eq_(expect, run(html, css))
+
 
 def main():
   test_target_text()
@@ -108,6 +129,8 @@ def main():
   test_content_basic()
   test_pseudo_simple()
   test_attr()
+  test_string_set()
+#  test_string_set_advanced()
 
 if __name__ == '__main__':
     import sys

@@ -12,22 +12,24 @@ __all__ = ['AddNumbering', 'UnsupportedError']
 
 STYLE_ATTRIBUTE = '_custom_style'
 
-PSEUDO_ELEMENT_NAME = '{http://www.w3.org/1999/xhtml}span' # For HTML5, it would be 'ins'
-
 class UnsupportedError(Exception): pass
 
 class State(object):
-  def __init__(self, node, counters):
+  def __init__(self, node, counters, strings):
     self.node = node
     self.counters = counters.copy()
+    self.strings = strings.copy()
 
 class AddNumbering(object):
 
-  def __init__(self, verbose=False):
+  def __init__(self, pseudo_element_name='{http://www.w3.org/1999/xhtml}span', verbose=False):
     self.counters = {}
     self.node_at = {}
     self.reprocess = [] # nodes with content: target-counter(....) and the current counter values at that point for the node: (etree.Element, {'name', 4})
+    self.strings = {} # http://www.w3.org/TR/css3-gcpm/#named-strings
     self.verbose = verbose
+    self.pseudo_element_name = pseudo_element_name
+
 
   def transform(self, html, explicit_styles = [], pretty_print = True):
     xpath = etree.XPath('//*')
@@ -206,6 +208,12 @@ class AddNumbering(object):
     # Ignore the leader function
     pass
 
+  # http://www.w3.org/TR/css3-gcpm/#using-named-strings
+  def _eval_string(self, node, args):
+    print "Evaluating string and it's: %s" % str(self.strings)
+    if args in self.strings:
+      return self.strings[args]
+
   def update_counters(self, node, d):
     if 'counter-reset' in d:
       for (name, v) in d['counter-reset']:
@@ -226,7 +234,7 @@ class AddNumbering(object):
     # if there's a target-counter pointing to this node, squirrel the counter (TODO: Should this be done _before_ incrementing?)
     id = node.attrib.get('id', None)
     if id and id in self.node_at:
-      self.node_at[id] = State(node, self.counters)
+      self.node_at[id] = State(node, self.counters, self.strings)
     if d:
       # We'll have to look up the id later to find the counter
       if 'content' in d:
@@ -235,9 +243,24 @@ class AddNumbering(object):
           if key in [ 'target-counter', 'target-text' ]:
             has_target = True
         if has_target:
-          self.reprocess.append((node, State(node, self.counters)))
+          self.reprocess.append((node, State(node, self.counters, self.strings)))
         else:
           self._replace_content(node, d['content'])
+      # http://www.w3.org/TR/css3-gcpm/#setting-named-strings-the-string-set-pro
+      if 'string-set' in d:
+        has_target = False
+        for (key, _) in d['string-set'][1]: # [1] because we don't want to look at the string name
+          if key in [ 'target-counter', 'target-text' ]:
+            has_target = True
+        if has_target:
+          self.reprocess.append((node, State(node, self.counters, self.strings)))
+        else:
+          string_name = d['string-set'][0]
+          string_value = d['string-set'][1]
+          string_computed = self.make_content(node, string_value)
+          # Note: The 1st "value" is actually the string name
+          print "Setting string %s to [%s]" % (string_name, string_computed)
+          self.strings[string_name] = string_computed
 
   def expand_pseudo(self, node, style, class_ = ''):
     d = parse_style(style, class_)
@@ -273,7 +296,7 @@ class AddNumbering(object):
               if self.verbose: print >> sys.stderr, "WARNING: Ignoring lookup to a non-internal id: '%s' on a %s" % (href, n.tag)
     
     if not class_ and ':before' in style:
-      pseudo = etree.Element(PSEUDO_ELEMENT_NAME)
+      pseudo = etree.Element(self.pseudo_element_name)
       pseudo.attrib['class'] = 'pseudo-before'
       node.insert(0, pseudo)
       if node.text:
@@ -282,7 +305,7 @@ class AddNumbering(object):
       self.expand_pseudo(pseudo, style, ':before')
     
     if not class_ and ':after' in style:
-      pseudo = etree.Element(PSEUDO_ELEMENT_NAME)
+      pseudo = etree.Element(self.pseudo_element_name)
       pseudo.attrib['class'] = 'pseudo-after'
       node.append(pseudo)
       self.expand_pseudo(pseudo, style, ':after')

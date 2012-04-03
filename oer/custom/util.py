@@ -49,6 +49,12 @@ class PropertyParser(object):
     return self._counter(value, 1)
   def _parse_content(self, value):
     return ContentPropertyParser().parse(value)
+  # http://www.w3.org/TR/css3-gcpm/#setting-named-strings-the-string-set-pro
+  # Note: The 1st arg in the "value" is the string name
+  def _parse_string_set(self, value):
+    string_name = value.split(' ')[0]
+    string_value = value[len(string_name) + 1:]
+    return ( string_name, ContentPropertyParser().parse(string_value) )
   def _parse_display(self, value):
     if 'none' in value:
       return 'none'
@@ -56,12 +62,12 @@ class PropertyParser(object):
 
 class ContentPropertyParser(object):
   
-  def parse(self, content):
+  def parse(self, value):
     """ Given a string like "'Exercise ' target-counter(attr(href, url), chapter, decimal) counters(section)"
         return a list of the form:
         (function-name or None, values) """
     vals = []
-    stream = TokenStream(cssselect.tokenize(content))
+    stream = TokenStream(cssselect.tokenize(value))
     while stream.peek() is not None:
       t = stream.next()
       if isinstance(t, String):
@@ -172,6 +178,11 @@ class ContentPropertyParser(object):
   #  assert str(stream.next()) == ')'
   #  return leader
 
+  def _parse_string(self, stream):
+    assert str(stream.next()) == '('
+    string_name = stream.next()
+    assert str(stream.next()) == ')'
+    return string_name
 
 def _is_int(s):
   try: 
