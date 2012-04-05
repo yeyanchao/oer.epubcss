@@ -6,13 +6,11 @@ from lxml import etree
 
 from custom import premailer
 from custom import numbers
-from custom.util import PropertyParser, ContentPropertyParser, parse_style, ContentEvaluator, State
+from custom.util import PropertyParser, ContentPropertyParser, parse_style, ContentEvaluator, State, UnsupportedError
 
 __all__ = ['AddNumbering', 'UnsupportedError']
 
 STYLE_ATTRIBUTE = '_custom_style'
-
-class UnsupportedError(Exception): pass
 
 class AddNumbering(object):
 
@@ -39,6 +37,21 @@ class AddNumbering(object):
     # - recalculate all the remaining content (that has target-counter) by looking up the nodes
     # - remove the styling attribute
     
+    if self.verbose: print >> sys.stderr, "-------- Finding target nodes ( CSS target-counter() or target-text() ) : %d" % len(nodes)
+    for node in nodes:
+      style = node.attrib.get(STYLE_ATTRIBUTE, '')
+      style = PropertyParser().parse(style)
+      if 'content' in style:
+        for (name, value) in style['content']:
+          attr = None
+          if 'target-text' == name: (attr, _) = value
+          if 'target-counter' == name: (attr, _, _) = value
+          if attr:
+            id = node.attrib.get(attr, None)
+            if id[0] == '#':
+              id = id[1:]
+            self.node_at[id] = None
+
     if self.verbose: print >> sys.stderr, "-------- Creating pseudo elements ( CSS :before and :after ) : %d" % len(nodes)
     for node in nodes:
       style = node.attrib.get(STYLE_ATTRIBUTE, '')
@@ -61,6 +74,42 @@ class AddNumbering(object):
         for child in node:
           if not self.is_pseudo(child):
             node.remove(child)
+    
+    if self.verbose: print >> sys.stderr, "-------- Moving nodes ( CSS3 http://www.w3.org/TR/css3-content/#moving ) : %d" % len(self.nodes)
+    nodes = xpath(html) # we may have removed nodes re-self.update
+    move_to_destinations = {} # name -> list of nodes waiting to be dumped
+    print etree.tostring(html)
+    for node in nodes:
+      style = PropertyParser().parse(node.attrib.get(STYLE_ATTRIBUTE, ''))
+      if 'move-to' in style:
+        dest = style['move-to']
+        if dest != 'here': # Ignore if it's 'here'
+          if dest not in move_to_destinations: move_to_destinations[dest] = []
+          move_to_destinations[dest].append(node)
+          # Can't just remove the node. because of tails...
+          if node.tail is not None:
+            if node.getprevious() is not None:
+              if node.getprevious().tail is not None:
+                node.getprevious().tail += node.tail
+              else:
+                node.getprevious().tail = node.tail
+            else:
+              if node.getparent().text is not None:
+                node.getparent().text += node.tail
+              else:
+                node.getparent().text = node.tail
+            node.tail = None
+          node.getparent().remove(node)
+          
+      if 'content' in style:
+        for (name, pending_name) in style['content']:
+          if 'pending' == name:
+            #TODO remove all children and text
+            pending_name = str(pending_name)
+            if pending_name in move_to_destinations:
+              for n in move_to_destinations[pending_name]:
+                node.append(n)
+              move_to_destinations[pending_name] = []
     
     # Clean up the HTML.
     for node in nodes:
@@ -108,7 +157,7 @@ class AddNumbering(object):
     # if there's a target-counter pointing to this node, squirrel the counter (TODO: Should this be done _before_ incrementing?)
     id = node.attrib.get('id', None)
     if id and id in self.node_at:
-      self.node_at[id] = State(node, self.evaluator.state)
+      self.node_at[id] = (node, State(self.evaluator.state))
     if d:
       # We'll have to look up the id later to find the counter
       if 'content' in d:
@@ -117,7 +166,7 @@ class AddNumbering(object):
           if key in [ 'target-counter', 'target-text' ]:
             has_target = True
         if has_target:
-          self.reprocess.append((node, State(node, self.evaluator.state)))
+          self.reprocess.append((node, State(self.evaluator.state)))
         else:
           self._replace_content(node, d['content'])
       # http://www.w3.org/TR/css3-gcpm/#setting-named-strings-the-string-set-pro
@@ -127,10 +176,9 @@ class AddNumbering(object):
           if key in [ 'target-counter', 'target-text' ]:
             has_target = True
         if has_target:
-          self.reprocess.append((node, State(node, self.evaluator.state)))
+          self.reprocess.append((node, State(self.evaluator.state)))
         else:
-          string_name = d['string-set'][0]
-          string_value = d['string-set'][1]
+          string_name, string_value = d['string-set']
           string_computed = self.evaluator.eval_content(node, string_value)
           # Note: The 1st "value" is actually the string name
           print "Setting string %s to [%s]" % (string_name, string_computed)

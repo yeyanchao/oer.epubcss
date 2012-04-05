@@ -120,6 +120,17 @@ def test_string_set_advanced():
   expect = """<html><body><test href="#itsme"/><test2 id="itsme">AE</test2>X</body></html>"""
   eq_(expect, run(html, css))
 
+def test_move_to():
+  css    = """test::before  { move-to: BUCKET1; content: "123"; }
+              test          { move-to: BUCKET2; }
+              test:after    { move-to: BUCKET1; content: "456";}
+              test2:before  { content: pending(BUCKET1); }
+              test2:after   { content: pending(BUCKET2); }
+              """
+  html   = """<html><body><test>ABC</test>tail1<test2>DEF</test2>tail2</body></html>"""
+  expect = """<html><body>tail1<test2><span class="pseudo-before"><span class="pseudo-before">123</span><span class="pseudo-after">456</span></span>DEF<span class="pseudo-after"><test>ABC</test></span></test2>tail2</body></html>"""
+  eq_(expect, run(html, css))
+
 
 def main():
   test_target_text()
@@ -131,6 +142,7 @@ def main():
   test_attr()
   test_string_set()
 #  test_string_set_advanced()
+  test_move_to()
 
 if __name__ == '__main__':
     import sys

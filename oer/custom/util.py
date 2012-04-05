@@ -3,9 +3,10 @@ from lxml.cssselect import TokenStream, String, Symbol, Token
 
 import numbers
 
+class UnsupportedError(Exception): pass
+
 class State(object):
-  def __init__(self, node = None, state = None):
-    self.node = node
+  def __init__(self, state = None):
     self.counters = {}
     self.strings = {}
     if state:
@@ -69,6 +70,10 @@ class PropertyParser(object):
   def _parse_display(self, value):
     if 'none' in value:
       return 'none'
+  # http://www.w3.org/TR/css3-content/#moving
+  def _parse_move_to(self, value):
+    move_dest = value
+    return move_dest
       
 
 class ContentPropertyParser(object):
@@ -195,6 +200,13 @@ class ContentPropertyParser(object):
     assert str(stream.next()) == ')'
     return string_name
 
+  # http://www.w3.org/TR/css3-content/#moving
+  def _parse_pending(self, stream):
+    assert str(stream.next()) == '('
+    pending_name = stream.next()
+    assert str(stream.next()) == ')'
+    return pending_name
+
 class ContentEvaluator(object):
   def __init__(self, node_at = {}, state = None, verbose = False):
     self.verbose = verbose
@@ -231,24 +243,24 @@ class ContentEvaluator(object):
   
   def lookup_text(self, node, attr, which):
     """ Used by target-text(attr(href), content(first-letter)) """
-    state = self.lookup_state(node, attr)
+    target_node, state = self.lookup_state(node, attr)
     if state:
       if which == 'before':
-        if len(state.node) > 0 and self.is_pseudo(state.node[0]):
-          return state.node[0].text # guaranteed it doesn;t have child elements
+        if len(target_node) > 0 and self.is_pseudo(target_node[0]):
+          return target_node[0].text # guaranteed it doesn;t have child elements
       elif which == 'after':
-        if len(state.node) > 0 and self.is_pseudo(state.node[-1]):
-          return state.node[-1].text # guaranteed it doesn;t have child elements
+        if len(target_node) > 0 and self.is_pseudo(target_node[-1]):
+          return target_node[-1].text # guaranteed it doesn;t have child elements
       else:
         text = ''
-        if state.node.text: text += state.node.text
+        if target_node.text: text += target_node.text
         def rec_add(n):
           text = ''
           if n.text: text += n.text
           for s in n: text += rec_add(s)
           if n.tail: text += n.tail
           return text
-        for child in state.node:
+        for child in target_node:
           if not self.is_pseudo(child):
             text += rec_add(child)
           elif child.tail: text += child.tail
@@ -262,7 +274,7 @@ class ContentEvaluator(object):
   def lookup_counter(self, node, attr, name):
     # Look up the node (strip of the leading "#" in the href)
     v = 0
-    state = self.lookup_state(node, attr)
+    _, state = self.lookup_state(node, attr)
     if state:
       if not state.counters:
         if self.verbose: print >> sys.stderr, "WARNING: Trying to get target-counter of a non-existent id '%s'" % id
@@ -314,6 +326,10 @@ class ContentEvaluator(object):
 
   def _eval_leader(self, node, args):
     # Ignore the leader function
+    pass
+  
+  def _eval_pending(self, node, args):
+    # Ignore for now. there's another pass on all the nodes (once the counters and text are calculated) that will look at this
     pass
 
   # http://www.w3.org/TR/css3-gcpm/#using-named-strings
