@@ -1,14 +1,19 @@
-#from nose.tools import eq_, ok_
+import sys
 from lxml import etree
 from epubcss import AddNumbering
 
 VERBOSE = False
+EXIT_CODE = [0]
 
-def eq_(expect, actual):
-  if expect != actual:
-    print "ERROR!"
-    print "expected=[" + expect + "]"
-    print "actual  =[" + actual + "]"
+try:
+  from nose.tools import eq_, ok_
+except ImportError:
+  def eq_(expect, actual):
+    if expect != actual:
+      EXIT_CODE[0] = 1
+      print >> sys.stderr, "ERROR!"
+      print >> sys.stderr, "expected=[" + expect + "]"
+      print >> sys.stderr, "actual  =[" + actual + "]"
 
 def run(html, css):
   actual = AddNumbering(pseudo_element_name='span', verbose = VERBOSE).transform(html, [css], pretty_print = False)
@@ -143,6 +148,7 @@ def main():
   test_string_set()
 #  test_string_set_advanced()
   test_move_to()
+  return EXIT_CODE[0]
 
 if __name__ == '__main__':
     import sys
