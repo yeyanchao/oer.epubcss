@@ -225,8 +225,11 @@ class Premailer(object):
         for selector, style in rules:
             new_selector = selector
             class_ = ''
-            if ':' in selector:
-                new_selector, class_ = re.split(':', selector, 1)
+            # The ':not()' selector causes things to break
+            # becaue it can occur in the middle of a rule
+            # So, force "::" for before/after
+            if '::before' in selector or '::after' in selector:
+                new_selector, class_ = re.split('::', selector, 1)
                 class_ = ':%s' % class_
 
             # Keep filter-type selectors untouched.
