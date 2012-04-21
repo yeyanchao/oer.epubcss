@@ -11,6 +11,7 @@ Some useful "features" in CSS that are "baked in" using this tool:
 - counters for numbering sections, figures, tables, etc
 - the content property (used to replace the contents of a tag)
 - looking up text elsewhere (target-text)
+- moving content later in the document (move-to)
 
 Specifically, this supports:
 
@@ -21,6 +22,7 @@ Specifically, this supports:
 - https://developer.mozilla.org/en/CSS/counter-increment
 - http://www.w3.org/TR/css3-gcpm/#the-target-counter-and-target-counters-v
 - http://www.w3.org/TR/css3-gcpm/#the-target-text-value
+- http://www.w3.org/TR/css3-content/#moving
 
 The resulting HTML file has all of these pseudo elements and replaced content "baked in".
 
@@ -61,6 +63,27 @@ For example, let's say you have the following CSS and HTML::
 This tool spits out the following::
 
   Be sure to check out <a href="#factoring"><span>4.7 Factoring Polynomials</span></a>.
+
+
+------------------------------
+ Moving Content Later (CSS 3)
+------------------------------
+
+Occasionally you may want to move content to have it display somewhere other than where it is; that's where ``move-to`` comes to the rescue!
+
+For example, let's say you have the following HTML::
+
+  <div class="chapter">
+    <div class="exercise">What is 1+1?</div>
+    <p>Some content</p>
+    <p>Some more content</p>
+  </div>
+
+And you'd like to move all the exercises to the end of a chapter.
+You can accomplish that by using the following CSS::
+
+  .exercise { move-to: chapter-exercises; }
+  .chapter::after { content: pending(chapter-exercises); }
 
 
 ------------------------------
