@@ -9,6 +9,7 @@
 import codecs
 from lxml import etree
 from lxml.cssselect import CSSSelector
+from lxml.cssselect import ExpressionError
 import sys
 import os
 import re
@@ -27,6 +28,10 @@ class PremailerError(Exception):
 
 grouping_regex = re.compile('([:\-\w]*){([^}]+)}')
 
+
+def should_apply_style(style):
+  # return True
+  return 'content:' in style or 'string-' in style or 'counter-' in style or 'move-to' in style or 'display:none' in style
 
 # HACK: TODO: get _merge_stylesso epub doesn't use content: with functions it doesn't understand and meant for epub (CSS3+)
 #def is_valid():
@@ -243,9 +248,13 @@ class Premailer(object):
             # - manipulating counters
             # AND: TODO (this will be fixed by _merge_styles using util.parse_style)
             # - the property values don't contain unknown functions or the PDF-specific "page" counter
-            if 'content:' in style or 'string-' in style or 'counter-' in style or 'move-to' in style or 'display:none' in style:
+            if should_apply_style(style):
               if self.verbose: print >> sys.stderr, "Applying CSS Selector: [%s%s]" % (selector, class_),
-              sel = CSSSelector(selector)
+              try:
+                sel = CSSSelector(selector)
+              except ExpressionError:
+                if self.verbose: print >> sys.stderr, "Ignoring rule"
+                continue
               nodes = sel(page)
               if self.verbose: print >> sys.stderr, "%d times" % len(nodes)
   

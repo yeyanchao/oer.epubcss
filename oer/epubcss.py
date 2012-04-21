@@ -10,7 +10,9 @@ from custom.util import PropertyParser, ContentPropertyParser, parse_style, Cont
 
 __all__ = ['AddNumbering', 'UnsupportedError']
 
-STYLE_ATTRIBUTE = '_custom_style'
+# By default use a special attribute and remove it at the end of parsing
+# (do not apply alls the "simple' styles like color, font-face, etc
+STYLE_ATTRIBUTE = '_custom_style' # 'style'
 
 class AddNumbering(object):
 
@@ -75,10 +77,9 @@ class AddNumbering(object):
           if not self.is_pseudo(child):
             node.remove(child)
     
-    if self.verbose: print >> sys.stderr, "-------- Moving nodes ( CSS3 http://www.w3.org/TR/css3-content/#moving ) : %d" % len(self.nodes)
+    if self.verbose: print >> sys.stderr, "-------- Moving nodes ( CSS3 http://www.w3.org/TR/css3-content/#moving ) : %d" % len(nodes)
     nodes = xpath(html) # we may have removed nodes re-self.update
     move_to_destinations = {} # name -> list of nodes waiting to be dumped
-    print etree.tostring(html)
     for node in nodes:
       style = PropertyParser().parse(node.attrib.get(STYLE_ATTRIBUTE, ''))
       if 'move-to' in style:
@@ -112,9 +113,10 @@ class AddNumbering(object):
               move_to_destinations[pending_name] = []
     
     # Clean up the HTML.
-    for node in nodes:
-      if STYLE_ATTRIBUTE in node.attrib:
-        del node.attrib[STYLE_ATTRIBUTE]
+    if STYLE_ATTRIBUTE != 'style':
+      for node in nodes:
+        if STYLE_ATTRIBUTE in node.attrib:
+          del node.attrib[STYLE_ATTRIBUTE]
     
     return html
 
@@ -252,12 +254,14 @@ def main():
       args = parser.parse_args()
   
       # if self.verbose: if self.verbose: print >> sys.stderr, "Transforming..."
-      css = []
-      for style in args.css:
-        css.append(style.read())
-      result = AddNumbering(verbose=args.verbose).transform(args.html.read(), css)
-      html = etree.tostring(result, encoding='ascii')
-      args.output.write(html)
+      if args.html:
+        css = []
+        if args.css:
+          for style in args.css:
+            css.append(style.read())
+        result = AddNumbering(verbose=args.verbose).transform(args.html.read(), css)
+        html = etree.tostring(result, encoding='ascii')
+        args.output.write(html)
       
     except ImportError:
       print "argparse is needed for commandline"
