@@ -26,15 +26,15 @@ def test_content_basic():
   eq_(expect, run(html, css))
 
 def test_pseudo_simple():
-  css    = """body::before { content: "before"; }
-              body::after { content: "after"; }
+  css    = """body:::before { content: "before"; }
+              body:::after { content: "after"; }
               """
   html   = """<html><body>text1<em/>text2</body></html>"""
   expect = """<html><body><span class="pseudo-before">before</span>text1<em/>text2<span class="pseudo-after">after</span></body></html>"""
   eq_(expect, run(html, css))
 
 def test_attr():
-  css    = """body:before { content: attr(href); }"""
+  css    = """body::before { content: attr(href); }"""
   html   = """<html><body href="pass">fail</body></html>"""
   expect = """<html><body href="pass"><span class="pseudo-before">pass</span>fail</body></html>"""
   eq_(expect, run(html, css))
@@ -52,8 +52,8 @@ def test_target_counter():
   css    = """body        { counter-reset: counter 20; }
               em          { counter-increment: counter; }
               test        { content: target-counter(attr(href), counter); }
-              test:before { content: target-counter(attr(href), counter, lower-roman); }
-              test:after  { content: target-counter(attr(href), counter, upper-latin); }
+              test::before { content: target-counter(attr(href), counter, lower-roman); }
+              test::after  { content: target-counter(attr(href), counter, upper-latin); }
               """
   html   = """<html><body><test href="#correct"/><em id="some-other-test"/><em id="correct"/></body></html>"""
   expect = """<html><body><test href="#correct"><span class="pseudo-before">xxii</span>22<span class="pseudo-after">V</span></test><em id="some-other-test"/><em id="correct"/></body></html>"""
@@ -63,7 +63,7 @@ def test_content_replace_and_counter():
   """ This test replaces the content of an element (deleting the child) and increments the child"""
   css    = """test        { counter-increment: counter; }
               body        { content: target-counter(attr(href), counter); }
-              body:before { content: target-counter(attr(href), counter); }
+              body::before { content: target-counter(attr(href), counter); }
               """
   html   = """<html><body href="#correct"><test id="some-other-test"/><test id="correct"/></body></html>"""
   expect = """<html><body href="#correct"><span class="pseudo-before">2</span>2</body></html>"""
@@ -80,12 +80,12 @@ def test_display_none():
 
 def test_target_text():
   css    = """test          { content: target-text(attr(href), content()); }
-              test::before  { content: target-text(attr(href), content(before)); }
-              test::after   { content: target-text(attr(href), content(after)); }
-              test2::before { content: "BEFORE"; }
-              test2::after  { content: "AFTER"; }
-              inner::before { content: "B"; }
-              inner::after  { content: "D"; }
+              test:::before  { content: target-text(attr(href), content(before)); }
+              test:::after   { content: target-text(attr(href), content(after)); }
+              test2:::before { content: "BEFORE"; }
+              test2:::after  { content: "AFTER"; }
+              inner:::before { content: "B"; }
+              inner:::after  { content: "D"; }
               hide          { display: none; }
               """
   html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
@@ -94,12 +94,12 @@ def test_target_text():
 
 def test_target_text_and_counters():
   css    = """test          { content: target-text(attr(href), content()); }
-              test::before  { content: target-text(attr(href), content(before)); }
-              test::after   { content: target-text(attr(href), content(after)); }
-              test2::before { content: "BEFORE"; }
-              test2::after  { content: "AFTER"; }
-              inner::before { content: "B"; }
-              inner::after  { content: "D"; }
+              test:::before  { content: target-text(attr(href), content(before)); }
+              test:::after   { content: target-text(attr(href), content(after)); }
+              test2:::before { content: "BEFORE"; }
+              test2:::after  { content: "AFTER"; }
+              inner:::before { content: "B"; }
+              inner:::after  { content: "D"; }
               hide          { display: none; }
               """
   html   = """<html><body><test href="#itsme"/><test2 id="itsme">A<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
@@ -109,7 +109,7 @@ def test_target_text_and_counters():
 def test_string_set():
   css    = """html          { string-set: test-string "SHOULD NEVER SEE THIS"; }
               body          { string-set: test-string "SIMPLE"; }
-              test::before  { content: string(test-string); }
+              test:::before  { content: string(test-string); }
               test          { string-set: test-string target-text(attr(href), content()) " LOKKING-UP-A-LINK"; }
               test2         { content: string(test-string); }
               """
@@ -126,11 +126,11 @@ def test_string_set_advanced():
   eq_(expect, run(html, css))
 
 def test_move_to():
-  css    = """test::before  { move-to: BUCKET1; content: "123"; }
+  css    = """test:::before  { move-to: BUCKET1; content: "123"; }
               test          { move-to: BUCKET2; }
-              test:after    { move-to: BUCKET1; content: "456";}
-              test2:before  { content: pending(BUCKET1); }
-              test2:after   { content: pending(BUCKET2); }
+              test::after    { move-to: BUCKET1; content: "456";}
+              test2::before  { content: pending(BUCKET1); }
+              test2::after   { content: pending(BUCKET2); }
               """
   html   = """<html><body><test>ABC</test>tail1<test2>DEF</test2>tail2</body></html>"""
   expect = """<html><body>tail1<test2><span class="pseudo-before"><span class="pseudo-before">123</span><span class="pseudo-after">456</span></span>DEF<span class="pseudo-after"><test>ABC</test></span></test2>tail2</body></html>"""
