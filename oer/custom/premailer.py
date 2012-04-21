@@ -170,7 +170,7 @@ class Premailer(object):
         if etree is None:
             return self.html
 
-        parser = etree.XMLParser()
+        parser = etree.HTMLParser() # etree.XMLParser()
         tree = etree.fromstring(self.html.strip(), parser).getroottree()
         page = tree.getroot()
 
