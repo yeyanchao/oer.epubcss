@@ -14,20 +14,53 @@ __all__ = ['AddNumbering', 'UnsupportedError']
 # (do not apply alls the "simple' styles like color, font-face, etc
 STYLE_ATTRIBUTE = '_custom_style' # 'style'
 
+# Maps different features with which properties they support and which content they support
+FEATURES = {
+  'counter': (['counter-reset', 'counter-increment'], ['counter', 'counters']),
+  'target' : ([], ['target-text', 'target-counter', 'target-counters']),
+  'string' : (['string-set'], ['string']),
+  'move'   : (['move-to'], ['pending'])
+}
+
 class AddNumbering(object):
 
-  def __init__(self, pseudo_element_name='{http://www.w3.org/1999/xhtml}span', verbose=False):
+  def __init__(self, args, pseudo_element_name='{http://www.w3.org/1999/xhtml}span'):
     self.node_at = {}
     self.evaluator = ContentEvaluator(self.node_at)
     self.reprocess = [] # nodes with content: target-counter(....) and the current counter values at that point for the node: (etree.Element, {'name', 4})
-    self.verbose = verbose
+    self.args = args
+    self.verbose = args.verbose
     self.pseudo_element_name = pseudo_element_name
 
 
   def transform(self, html, explicit_styles = [], pretty_print = True):
     xpath = etree.XPath('//*')
     
-    p = premailer.Premailer(html, explicit_styles=explicit_styles, remove_classes=False, custom_style_attrib=STYLE_ATTRIBUTE, verbose=self.verbose)
+    supported_properties = {}
+    supported_content = {}
+
+    for (props, contents) in FEATURES.values():
+      for x in props:
+        supported_properties[x] = True
+      for x in contents:
+        supported_content[x] = True
+    
+    def del_features(feature):
+      (props, contents) = FEATURES[feature]
+      for x in props:
+        supported_properties[x] = False
+      for x in contents:
+        supported_content[x] = False
+
+    if self.args.no_counter: del_features('counter')
+    if self.args.no_target:  del_features('target')
+    if self.args.no_string:  del_features('string')
+    if self.args.no_move:    del_features('move')
+
+    if self.verbose: print >> sys.stderr, 'LOG: Supported properties: %s' % str(supported_properties)
+    if self.verbose: print >> sys.stderr, 'LOG: Supported content values: %s' % str(supported_content)
+    
+    p = premailer.Premailer(html, supported_properties=supported_properties, supported_content=supported_content, explicit_styles=explicit_styles, remove_classes=False, custom_style_attrib=STYLE_ATTRIBUTE, verbose=self.verbose)
     html = p.transform(pretty_print=pretty_print)
     html = etree.parse(StringIO(html))
     nodes = xpath(html)
@@ -250,6 +283,12 @@ def main():
       parser.add_argument('-v', dest='verbose', help='Verbose printing to stderr', action='store_true')
       parser.add_argument('-c', dest='css', help='CSS File', type=argparse.FileType('r'), nargs='*')
       parser.add_argument('-o', dest='output', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
+      # parser.add_argument('--no-pseudo', dest='no_pseudo', help='Do not Emulate pseudo elements', action='store_true')
+      parser.add_argument('--no-counter', dest='no_counter', help='Do not Emulate counters', action='store_true')
+      parser.add_argument('--no-target', dest='no_target', help='Do not Emulate target-text', action='store_true')
+      parser.add_argument('--no-string', dest='no_string', help='Do not Emulate string-set', action='store_true')
+      parser.add_argument('--no-move', dest='no_move', help='Do not Emulate move-to', action='store_true')
+      parser.add_argument('--no-default', dest='no_default', help='Emulate default styles', action='store_true')
       parser.add_argument('html',              nargs='?', type=argparse.FileType('r'), default=sys.stdin)
       args = parser.parse_args()
   
@@ -259,7 +298,7 @@ def main():
         if args.css:
           for style in args.css:
             css.append(style.read())
-        result = AddNumbering(verbose=args.verbose).transform(args.html.read(), css)
+        result = AddNumbering(args).transform(args.html.read(), css)
         html = etree.tostring(result, encoding='ascii')
         args.output.write(html)
       

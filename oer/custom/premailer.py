@@ -28,11 +28,6 @@ class PremailerError(Exception):
 
 grouping_regex = re.compile('([:\-\w]*){([^}]+)}')
 
-
-def should_apply_style(style):
-  # return True
-  return 'content:' in style or 'string-' in style or 'counter-' in style or 'move-to' in style or 'display:none' in style
-
 # HACK: TODO: get _merge_stylesso epub doesn't use content: with functions it doesn't understand and meant for epub (CSS3+)
 #def is_valid():
 #  s = parse_style(style)
@@ -122,7 +117,11 @@ class Premailer(object):
                  remove_classes=True,
                  strip_important=True,
                  external_styles=None,
+                 supported_properties=[],
+                 supported_content=[],
                  custom_style_attrib='style', explicit_styles=[], verbose=False): # HACK
+        self.supported_properties = supported_properties
+        self.supported_content = supported_content
         self.html = html
         self.base_url = base_url
         self.preserve_internal_links = preserve_internal_links
@@ -141,6 +140,16 @@ class Premailer(object):
         self.explicit_styles = explicit_styles
         self.verbose = verbose
 
+    def _should_apply_style(self, style):
+        for key in self.supported_properties:
+          if self.supported_properties[key] == False:
+            return False
+        if 'content:' in style:
+          #TODO Should be if only these are in the content: 
+          for key in self.supported_content:
+            if not self.supported_content[key] and key in style:
+              return False
+        return True
     def _parse_style_rules(self, css_body):
         leftover = []
         rules = []
@@ -248,7 +257,7 @@ class Premailer(object):
             # - manipulating counters
             # AND: TODO (this will be fixed by _merge_styles using util.parse_style)
             # - the property values don't contain unknown functions or the PDF-specific "page" counter
-            if should_apply_style(style):
+            if self._should_apply_style(style):
               if self.verbose: print >> sys.stderr, "Applying CSS Selector: [%s%s]" % (selector, class_),
               try:
                 sel = CSSSelector(selector)
