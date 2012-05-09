@@ -82,9 +82,9 @@ def _merge_styles(old, new, class_=''):
             merged[k] = v
     groups[class_] = merged
 
-    if len(groups) == 1:
         return '; '.join(['%s:%s' % (k, v) for
                           (k, v) in groups.values()[0].items()])
+    if len(groups) == 1 and groups.keys()[0] == '':
     else:
         all = []
         for class_, mergeable in sorted(groups.items(),

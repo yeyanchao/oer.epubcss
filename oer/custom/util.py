@@ -64,9 +64,40 @@ class PropertyParser(object):
   # http://www.w3.org/TR/css3-gcpm/#setting-named-strings-the-string-set-pro
   # Note: The 1st arg in the "value" is the string name
   def _parse_string_set(self, value):
-    string_name = value.split(' ')[0]
-    string_value = value[len(string_name) + 1:]
-    return ( string_name, ContentPropertyParser().parse(string_value) )
+    # string-set may set multiple strings (separated by commas)
+    # For example:
+    # { string-set: string1 "value1", string2 "value2", string3 counter(item, decimal); }
+    # Also, we can't just split on commas because for example target-text() has commas in it
+    # This first piece is just a glorified split(',')
+    stream = TokenStream(cssselect.tokenize(value))
+    values = []
+    acc = ''
+    parentheses = 0
+    while stream.peek() is not None:
+      token = stream.next()
+      if str(token) == ',' and parentheses == 0:
+        values.append(acc)
+        acc = ''
+      else:
+        if str(token) == '(':
+          parentheses += 1
+        elif str(token) == ')':
+          parentheses -= 1
+        
+        if type(token) == String:
+          acc += '"%s" ' % str(token)
+        else:
+          acc += str(token) + ' '
+    if acc != '':
+      values.append(acc)
+        
+    acc = []
+    for val in values:
+      stream = TokenStream(cssselect.tokenize(val))
+      string_name = str(stream.next())
+      string_value = val[len(string_name) + 1:]
+      acc.append((string_name, ContentPropertyParser().parse(string_value)))
+    return acc
   def _parse_display(self, value):
     if 'none' in value:
       return 'none'

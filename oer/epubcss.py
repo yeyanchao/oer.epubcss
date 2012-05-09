@@ -29,7 +29,9 @@ class AddNumbering(object):
     self.evaluator = ContentEvaluator(self.node_at)
     self.reprocess = [] # nodes with content: target-counter(....) and the current counter values at that point for the node: (etree.Element, {'name', 4})
     self.args = args
-    self.verbose = args.verbose
+    self.verbose = False
+    if args is not None:
+      self.verbose = args.verbose
     self.pseudo_element_name = pseudo_element_name
 
 
@@ -52,10 +54,11 @@ class AddNumbering(object):
       for x in contents:
         supported_content[x] = False
 
-    if self.args.no_counter: del_features('counter')
-    if self.args.no_target:  del_features('target')
-    if self.args.no_string:  del_features('string')
-    if self.args.no_move:    del_features('move')
+    if self.args is not None:
+      if self.args.no_counter: del_features('counter')
+      if self.args.no_target:  del_features('target')
+      if self.args.no_string:  del_features('string')
+      if self.args.no_move:    del_features('move')
 
     if self.verbose: print >> sys.stderr, 'LOG: Supported properties: %s' % str(supported_properties)
     if self.verbose: print >> sys.stderr, 'LOG: Supported content values: %s' % str(supported_content)
@@ -207,17 +210,18 @@ class AddNumbering(object):
       # http://www.w3.org/TR/css3-gcpm/#setting-named-strings-the-string-set-pro
       if 'string-set' in d:
         has_target = False
-        for (key, _) in d['string-set'][1]: # [1] because we don't want to look at the string name
-          if key in [ 'target-counter', 'target-text' ]:
-            has_target = True
+        for (_, string_value) in d['string-set']:
+          for (operation, _) in string_value:
+            if operation in [ 'target-counter', 'target-text' ]:
+              has_target = True
         if has_target:
           self.reprocess.append((node, State(self.evaluator.state)))
         else:
-          string_name, string_value = d['string-set']
-          string_computed = self.evaluator.eval_content(node, string_value)
-          # Note: The 1st "value" is actually the string name
-          print "Setting string %s to [%s]" % (string_name, string_computed)
-          self.evaluator.state.strings[string_name] = string_computed
+          for (string_name, string_value) in d['string-set']:
+            string_computed = self.evaluator.eval_content(node, string_value)
+            # Note: The 1st "value" is actually the string name
+            print "Setting string %s to [%s]" % (string_name, string_computed)
+            self.evaluator.state.strings[string_name] = string_computed
 
   def expand_pseudo(self, node, style, class_ = ''):
     d = parse_style(style, class_)

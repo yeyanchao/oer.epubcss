@@ -16,7 +16,7 @@ except ImportError:
       print >> sys.stderr, "actual  =[" + actual + "]"
 
 def run(html, css):
-  actual = AddNumbering(pseudo_element_name='span', verbose = VERBOSE).transform(html, [css], pretty_print = False)
+  actual = AddNumbering(None, pseudo_element_name='span').transform(html, [css], pretty_print = False)
   return etree.tostring(actual)
 
 def test_content_basic():
@@ -117,6 +117,14 @@ def test_string_set():
   expect = """<html><body><test href="#itsme"><span class="pseudo-before">SIMPLE</span></test><test2 id="itsme">SIMPLE<inner>C<hide>XXX</hide></inner>E</test2>X</body></html>"""
   eq_(expect, run(html, css))
 
+def test_string_set_multiple():
+  css    = """html          { string-set: test-string1 "success", test-string2 "SUCCESS"; }
+              test  { content: string(test-string1) " " string(test-string2); }
+              """
+  html   = """<html><body><test>FAILED</test></body></html>"""
+  expect = """<html><body><test>success SUCCESS</test></body></html>"""
+  eq_(expect, run(html, css))
+
 def test_string_set_advanced():
   css    = """test          { string-set: test-string target-text(attr(href), content()) " LOKKING-UP-A-LINK"; }
               test2         { content: string(test-string); }
@@ -146,6 +154,7 @@ def main():
   test_pseudo_simple()
   test_attr()
   test_string_set()
+  test_string_set_multiple()
 #  test_string_set_advanced()
   test_move_to()
   return EXIT_CODE[0]
